@@ -1,3 +1,26 @@
+# Water Level Monitor Systemd Service
+# 
+# IMPORTANT: Before installing this service, update the following paths:
+# 1. User=<your-username>
+# 2. WorkingDirectory=<full-path-to-water-monitor-directory>
+# 3. ExecStart=<full-path-to-water_monitor.py>
+#
+# Example for user 'pi' with project in home directory:
+#   User=pi
+#   WorkingDirectory=/home/pi/water-monitor
+#   ExecStart=/usr/bin/python3 /home/pi/water-monitor/water_monitor.py
+#
+# To install:
+#   1. Edit this file with correct paths
+#   2. sudo cp water-monitor.service /etc/systemd/system/
+#   3. sudo systemctl daemon-reload
+#   4. sudo systemctl enable water-monitor.service
+#   5. sudo systemctl start water-monitor.service
+#   6. sudo systemctl status water-monitor.service
+#
+# To check logs if service fails:
+#   sudo journalctl -u water-monitor.service -n 50
+
 [Unit]
 Description=Water Level Monitor
 After=network.target

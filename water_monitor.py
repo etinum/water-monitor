@@ -8,9 +8,27 @@ import RPi.GPIO as GPIO
 import time
 import smtplib
 import logging
+import os
+import sys
 from datetime import datetime, timedelta
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+
+# Verify working directory before importing config
+EXPECTED_DIR = "/home/erictran/Script/water-monitor"
+current_dir = os.getcwd()
+
+if not os.path.exists("config.py"):
+    print(f"ERROR: config.py not found in current directory: {current_dir}")
+    print(f"Expected directory: {EXPECTED_DIR}")
+    print(f"Please run from the correct directory or update the systemd service WorkingDirectory")
+    sys.exit(1)
+
+if current_dir != EXPECTED_DIR:
+    print(f"WARNING: Running from unexpected directory")
+    print(f"Current:  {current_dir}")
+    print(f"Expected: {EXPECTED_DIR}")
+    print(f"Continuing anyway since config.py was found...")
 
 # Import configuration
 from config import (

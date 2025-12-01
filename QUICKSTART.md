@@ -56,17 +56,30 @@ python3 water_monitor.py
 ```
 
 ### Option 2: Run as service (recommended)
+
+**Easy way - Use the installer script:**
 ```bash
-# Install service
+chmod +x install_service.sh
+./install_service.sh
+```
+
+**Manual way - Edit paths first:**
+```bash
+# 1. Edit water-monitor.service and update:
+#    - User=<your-username>
+#    - WorkingDirectory=<full-path-to-this-directory>
+#    - ExecStart=<full-path-to-water_monitor.py>
+
+# 2. Install service
 sudo cp water-monitor.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable water-monitor.service
 sudo systemctl start water-monitor.service
 
-# Check status
+# 3. Check status
 sudo systemctl status water-monitor.service
 
-# View live logs
+# 4. View live logs
 sudo journalctl -u water-monitor.service -f
 ```
 
