@@ -13,6 +13,7 @@ import sys
 from datetime import datetime, timedelta
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from logging.handlers import TimedRotatingFileHandler
 
 # Verify working directory before importing config
 EXPECTED_DIR = "/home/erictran/Script/water-monitor"
@@ -57,15 +58,25 @@ class WaterLevelMonitor:
         self.water_is_low = False
         self.low_water_start_time = None
         
-        # Setup logging
-        logging.basicConfig(
-            level=logging.INFO if ENABLE_DETAILED_LOGGING else logging.WARNING,
-            format='%(asctime)s - %(levelname)s - %(message)s',
-            handlers=[
-                logging.FileHandler(LOG_FILE),
-                logging.StreamHandler()
-            ]
-        )
+        # Setup logging with rotation (daily rotation, keep 5 days)
+        logger = logging.getLogger()
+        logger.setLevel(logging.INFO if ENABLE_DETAILED_LOGGING else logging.WARNING)
+        
+        # Clear existing handlers
+        if logger.hasHandlers():
+            logger.handlers.clear()
+            
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        
+        # File handler (rotates every midnight, keeps 3 days)
+        file_handler = TimedRotatingFileHandler(LOG_FILE, when="midnight", interval=1, backupCount=3)
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+        
+        # Stream handler (console)
+        stream_handler = logging.StreamHandler()
+        stream_handler.setFormatter(formatter)
+        logger.addHandler(stream_handler)
         
         # Setup GPIO
         GPIO.setmode(GPIO.BCM)
@@ -223,7 +234,7 @@ System is now operating normally.
                 if water_ok:
                     # Water level is OK
                     if ENABLE_DETAILED_LOGGING:
-                        logging.debug("Water level OK")
+                        logging.info("Water level OK")
                     self.handle_water_restored()
                 else:
                     # Water level is LOW

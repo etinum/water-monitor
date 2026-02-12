@@ -8,7 +8,7 @@ FLOAT_PIN = 17  # GPIO pin for float switch (BCM numbering)
 
 # Monitoring Settings
 CHECK_INTERVAL = 5  # Seconds between water level checks
-DEBOUNCE_TIME = 2   # Seconds to wait before confirming low water state (prevents false alarms)
+DEBOUNCE_TIME = 15  # Seconds to wait before confirming low water state (prevents false alarms)
 
 # Email Configuration (Gmail setup)
 EMAIL_NOTIFICATIONS_ENABLED = True
@@ -22,7 +22,7 @@ EMAIL_TO = ["eric.n.tran@gmail.com"]
 EMAIL_COOLDOWN_MINUTES = 30  # Wait 30 minutes between low water alerts
 
 # Logging Configuration
-LOG_FILE = "/home/erictran/Script/water_monitor.log"
+LOG_FILE = "/home/pi/Script/water_monitor.log"
 ENABLE_DETAILED_LOGGING = True
 
 # Alert Settings
