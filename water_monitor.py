@@ -97,10 +97,10 @@ class WaterLevelMonitor:
         pin_state = GPIO.input(FLOAT_PIN)
         
         # With pull-up resistor:
-        # HIGH (1) = float switch open = water level OK (float is up)
-        # LOW (0) = float switch closed to GND = water level LOW (float is down)
+        # HIGH (1) = float switch open = water level LOW
+        # LOW (0) = float switch closed to GND = water level OK
         
-        water_ok = (pin_state == GPIO.HIGH)
+        water_ok = (pin_state == GPIO.LOW)
         return water_ok
     
     def can_send_email(self):
