@@ -28,3 +28,8 @@ ENABLE_DETAILED_LOGGING = True
 # Alert Settings
 ALERT_ON_LOW_WATER = True
 ALERT_ON_WATER_RESTORED = True  # Send email when water level returns to normal
+
+# Weekly Summary Settings
+WEEKLY_SUMMARY_ENABLED = True
+WEEKLY_SUMMARY_DAY = 0  # 0 = Monday, 1 = Tuesday, ..., 6 = Sunday
+WEEKLY_SUMMARY_HOUR = 8  # Hour of the day to send summary (0-23 in local time)

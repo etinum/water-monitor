@@ -46,7 +46,10 @@ from config import (
     LOG_FILE,
     ENABLE_DETAILED_LOGGING,
     ALERT_ON_LOW_WATER,
-    ALERT_ON_WATER_RESTORED
+    ALERT_ON_WATER_RESTORED,
+    WEEKLY_SUMMARY_ENABLED,
+    WEEKLY_SUMMARY_DAY,
+    WEEKLY_SUMMARY_HOUR
 )
 
 class WaterLevelMonitor:
@@ -57,6 +60,12 @@ class WaterLevelMonitor:
         self.last_email_time = None
         self.water_is_low = False
         self.low_water_start_time = None
+        
+        # Stats for weekly summary
+        self.stats_start_time = datetime.now()
+        self.low_water_events = 0
+        self.emails_sent = 0
+        self.last_weekly_summary_date = None
         
         # Setup logging with rotation (daily rotation, keep 5 days)
         logger = logging.getLogger()
@@ -157,6 +166,7 @@ This is an automated alert from your Water Level Monitor.
             
             logging.info(f"Email notification sent: {subject}")
             self.last_email_time = datetime.now()
+            self.emails_sent += 1
             return True
             
         except Exception as e:
@@ -181,6 +191,7 @@ This is an automated alert from your Water Level Monitor.
             if not self.water_is_low:
                 # This is a new low water event
                 self.water_is_low = True
+                self.low_water_events += 1
                 logging.warning("⚠️  LOW WATER LEVEL CONFIRMED!")
                 
                 if ALERT_ON_LOW_WATER and self.can_send_email():
@@ -223,7 +234,50 @@ System is now operating normally.
         else:
             # Reset debounce timer if water is OK
             self.low_water_start_time = None
-    
+            
+    def check_and_send_weekly_summary(self):
+        """Check if it's time to send the weekly summary and send it"""
+        if not WEEKLY_SUMMARY_ENABLED:
+            return
+            
+        now = datetime.now()
+        
+        # Check if today is the target day and hour
+        if now.weekday() == WEEKLY_SUMMARY_DAY and now.hour == WEEKLY_SUMMARY_HOUR:
+            # Check if we already sent it today
+            if self.last_weekly_summary_date != now.date():
+                self.send_weekly_summary(now)
+                self.last_weekly_summary_date = now.date()
+
+    def send_weekly_summary(self, now):
+        """Send the weekly summary email"""
+        days_running = (now - self.stats_start_time).days
+        hours_running = (now - self.stats_start_time).seconds // 3600
+        
+        subject = "📊 Water Monitor: Weekly System Summary"
+        message = f"""Hello! This is your weekly check-in from the Water Level Monitor.
+The system is UP and RUNNING smoothly.
+
+--- Weekly Stats ---
+Monitoring Since: {self.stats_start_time.strftime('%Y-%m-%d %H:%M:%S')} (Uptime: {days_running} days, {hours_running} hours)
+Low Water Events Triggered: {self.low_water_events}
+Total Alerts Sent: {self.emails_sent}
+Current System Status: {'LOW WATER' if self.water_is_low else 'OK'}
+
+---
+System will now reset the weekly counters for the next reporting period.
+"""
+        
+        success = self.send_email_notification(subject, message)
+        
+        if success:
+            logging.info("Weekly summary email sent successfully.")
+            # Reset stats for the next week
+            self.stats_start_time = now
+            self.low_water_events = 0
+            # Reset emails so the summary email itself isn't counted in the next week's stats
+            self.emails_sent = 0
+
     def run(self):
         """Main monitoring loop"""
         logging.info("Starting water level monitoring...")
@@ -242,6 +296,8 @@ System is now operating normally.
                     # Water level is LOW
                     logging.info("Float switch triggered - water level low")
                     self.handle_low_water()
+                
+                self.check_and_send_weekly_summary()
                 
                 time.sleep(CHECK_INTERVAL)
                 
@@ -262,6 +318,11 @@ def main():
     print(f"Check interval: {CHECK_INTERVAL} seconds")
     print(f"Debounce time: {DEBOUNCE_TIME} seconds")
     print(f"Email alerts: {'Enabled' if EMAIL_NOTIFICATIONS_ENABLED else 'Disabled'}")
+    if WEEKLY_SUMMARY_ENABLED:
+        days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+        print(f"Weekly summary: Enabled ({days[WEEKLY_SUMMARY_DAY]} at {WEEKLY_SUMMARY_HOUR:02d}:00)")
+    else:
+        print("Weekly summary: Disabled")
     print("=" * 60)
     print()
     
