@@ -246,8 +246,8 @@ System is now operating normally.
         if now.weekday() == WEEKLY_SUMMARY_DAY and now.hour == WEEKLY_SUMMARY_HOUR:
             # Check if we already sent it today
             if self.last_weekly_summary_date != now.date():
-                self.send_weekly_summary(now)
-                self.last_weekly_summary_date = now.date()
+                if self.send_weekly_summary(now):
+                    self.last_weekly_summary_date = now.date()
 
     def send_weekly_summary(self, now):
         """Send the weekly summary email"""
@@ -269,7 +269,7 @@ System will now reset the weekly counters for the next reporting period.
 """
         
         success = self.send_email_notification(subject, message)
-        
+
         if success:
             logging.info("Weekly summary email sent successfully.")
             # Reset stats for the next week
@@ -277,6 +277,10 @@ System will now reset the weekly counters for the next reporting period.
             self.low_water_events = 0
             # Reset emails so the summary email itself isn't counted in the next week's stats
             self.emails_sent = 0
+        else:
+            logging.warning("Weekly summary email failed, will retry next cycle.")
+
+        return success
 
     def run(self):
         """Main monitoring loop"""
