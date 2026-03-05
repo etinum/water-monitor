@@ -220,9 +220,7 @@ Action Required:
             self.low_water_start_time = None
             logging.info("✓ Water level restored to normal")
             
-            # Only send restored email if a low water email was actually sent
-            # This prevents spam if water is bouncing at the sensor edge but NO email was sent yet
-            if ALERT_ON_WATER_RESTORED and not self.can_send_email():
+            if ALERT_ON_WATER_RESTORED:
                 subject = "✓ Water Level Restored"
                 message = """
 Good news! The water level has been restored to normal.
