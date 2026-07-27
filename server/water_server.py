@@ -246,6 +246,24 @@ Action Required:
                 if sent:
                     self.offline_alert_sent = True
 
+    async def heartbeat_loop(self):
+        """Hourly proof-of-life log line (first one ~60s after startup)."""
+        await asyncio.sleep(60)
+        while True:
+            if self.sensor_connected:
+                logging.info(
+                    f"heartbeat: water {'LOW ⚠️' if self.water_is_low else 'OK'}, sensor connected"
+                )
+            else:
+                mins = 0
+                if self.disconnected_since is not None:
+                    mins = int((datetime.now() - self.disconnected_since).total_seconds() // 60)
+                logging.info(
+                    f"heartbeat: sensor OFFLINE for {mins}m, "
+                    f"last known water state {'LOW' if self.water_is_low else 'OK'}"
+                )
+            await asyncio.sleep(3600)
+
     async def weekly_summary_loop(self):
         while True:
             await asyncio.sleep(60)
@@ -322,6 +340,7 @@ System will now reset the weekly counters for the next reporting period.
         await asyncio.gather(
             self.watchdog_loop(),
             self.weekly_summary_loop(),
+            self.heartbeat_loop(),
         )
 
 
