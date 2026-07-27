@@ -1,0 +1,63 @@
+# ESPHome config for the water level sensor
+# Device: generic ESP32 dev board (previously the Bluetooth Proxy at 192.168.1.213)
+# Float switch: one wire to GPIO4, other wire to GND (internal pull-up used)
+#
+# Flash from this directory:  esphome run water-sensor.yaml
+# WiFi credentials and keys live in secrets.yaml (same directory).
+
+esphome:
+  name: water-sensor
+  friendly_name: Water Sensor
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+logger:
+
+# Native API — the Mac mini server connects here (port 6053)
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  # Fallback hotspot if WiFi is unreachable (connect and visit 192.168.4.1)
+  ap:
+    ssid: "Water-Sensor Setup"
+    password: !secret ota_password
+
+captive_portal:
+
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO4
+      mode:
+        input: true
+        pullup: true
+    # Matches the Pi's (corrected) logic:
+    #   switch OPEN  -> pin HIGH -> sensor ON  -> water LOW
+    #   switch CLOSED -> pin LOW -> sensor OFF -> water OK
+    # If your readings come out inverted, add `inverted: true` under pin.
+    name: "Water Low"
+    id: water_low
+    device_class: problem
+    filters:
+      - delayed_on: 15s   # debounce: water must be low 15s before alerting (was DEBOUNCE_TIME)
+      - delayed_off: 2s
+
+# Diagnostics — also serve as a liveness heartbeat for the server
+sensor:
+  - platform: wifi_signal
+    name: "WiFi Signal"
+    update_interval: 60s
+  - platform: uptime
+    name: "Uptime"
+    update_interval: 60s
