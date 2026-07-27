@@ -54,6 +54,15 @@ binary_sensor:
       - delayed_off: 2s
 
 # Diagnostics — also serve as a liveness heartbeat for the server
+text_sensor:
+  - platform: wifi_info
+    ssid:
+      name: "WiFi SSID"
+    bssid:
+      name: "WiFi BSSID"
+    ip_address:
+      name: "IP Address"
+
 sensor:
   - platform: wifi_signal
     name: "WiFi Signal"
