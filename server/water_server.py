@@ -77,6 +77,8 @@ class WaterMonitorServer:
         self.offline_alert_sent = False
 
         self.water_sensor_key = None
+        self.entity_ids = {}  # entity key -> object_id
+        self.wifi_info = {}   # wifi_ssid / wifi_bssid / wifi_signal / ip_address
         self.client = None
         self.reconnect_logic = None
 
@@ -172,6 +174,21 @@ System is now operating normally.
     def on_state(self, state):
         if isinstance(state, BinarySensorState) and state.key == self.water_sensor_key:
             asyncio.create_task(self.handle_water_state(state.state))
+            return
+        obj = self.entity_ids.get(state.key)
+        if obj in ("wifi_ssid", "wifi_bssid", "ip_address", "wifi_signal"):
+            if not getattr(state, "missing_state", False):
+                self.wifi_info[obj] = state.state
+
+    def wifi_summary(self):
+        """One-line description of the sensor's WiFi connection, or '' if unknown."""
+        if not self.wifi_info:
+            return ""
+        ssid = self.wifi_info.get("wifi_ssid", "?")
+        bssid = self.wifi_info.get("wifi_bssid", "?")
+        rssi = self.wifi_info.get("wifi_signal")
+        rssi_part = f" @ {rssi:.0f} dBm" if isinstance(rssi, (int, float)) else ""
+        return f"wifi {ssid} via AP {bssid}{rssi_part}"
 
     async def on_connect(self):
         logging.info("Connected to ESP32 sensor")
@@ -186,6 +203,7 @@ System is now operating normally.
             logging.error(f"Failed to list entities: {e}")
             return
 
+        self.entity_ids = {e.key: e.object_id for e in entities}
         self.water_sensor_key = None
         for entity in entities:
             if isinstance(entity, BinarySensorInfo) and entity.object_id == WATER_SENSOR_OBJECT_ID:
@@ -251,8 +269,10 @@ Action Required:
         await asyncio.sleep(60)
         while True:
             if self.sensor_connected:
+                wifi = self.wifi_summary()
                 logging.info(
                     f"heartbeat: water {'LOW ⚠️' if self.water_is_low else 'OK'}, sensor connected"
+                    + (f", {wifi}" if wifi else "")
                 )
             else:
                 mins = 0
@@ -295,6 +315,7 @@ Monitoring Since: {self.stats_start_time.strftime('%Y-%m-%d %H:%M:%S')} (Uptime:
 Low Water Events Triggered: {self.low_water_events}
 Total Alerts Sent: {self.emails_sent}
 Current System Status: {sensor_status}
+Sensor Connection: {self.wifi_summary() or 'unknown'}
 
 ---
 System will now reset the weekly counters for the next reporting period.
