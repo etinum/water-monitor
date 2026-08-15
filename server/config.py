@@ -5,7 +5,7 @@ Configuration for the water monitor server (runs on the Mac mini)
 
 # ESP32 sensor (ESPHome native API)
 SENSOR_HOST = "water-sensor.local"  # falls back to IP below if mDNS fails
-SENSOR_HOST_FALLBACK = "192.168.1.213"
+SENSOR_HOST_FALLBACK = "192.168.1.207"
 SENSOR_PORT = 6053
 API_ENCRYPTION_KEY = "cN6BW3ebipgdymPWTCiz+or8BKAXNwIXZGdBnNH9478="
 

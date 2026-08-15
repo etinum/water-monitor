@@ -5,25 +5,36 @@
   <key>Label</key>
   <string>com.erictran.water-monitor</string>
 
+  <!--
+    Runs as a system LaunchDaemon (/Library/LaunchDaemons), NOT a user LaunchAgent.
+    This is required, not stylistic: macOS 15+ Local Network Privacy silently denies
+    local-subnet traffic (TCP + mDNS) to launchd-spawned user-domain processes, and
+    ad-hoc-signed binaries like tmux/python never register in the Local Network pane,
+    so there is no permission to grant. System-domain daemons are exempt.
+    See TROUBLESHOOTING.md — this cost us 24h of silent downtime on 2026-08-14.
+  -->
   <key>ProgramArguments</key>
   <array>
-    <string>/Users/erictran/Script/water-monitor/run_server.sh</string>
+    <string>/Users/erictran/Script/water-monitor/venv/bin/python3</string>
+    <string>-u</string>
+    <string>/Users/erictran/Script/water-monitor/water_server.py</string>
   </array>
 
   <key>WorkingDirectory</key>
   <string>/Users/erictran/Script/water-monitor</string>
 
-  <!-- Start the tmux session at login -->
   <key>RunAtLoad</key>
   <true/>
 
-  <!-- Re-check every 5 min and recreate the session if it was killed -->
-  <key>StartInterval</key>
-  <integer>300</integer>
+  <!-- launchd restarts the server if it ever exits; replaces the old tmux watchdog loop -->
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
 
   <key>StandardOutPath</key>
-  <string>/tmp/water-monitor.out.log</string>
+  <string>/Users/erictran/Script/water-monitor/server.out.log</string>
   <key>StandardErrorPath</key>
-  <string>/tmp/water-monitor.err.log</string>
+  <string>/Users/erictran/Script/water-monitor/server.err.log</string>
 </dict>
 </plist>

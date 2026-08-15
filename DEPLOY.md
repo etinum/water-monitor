@@ -1,286 +1,119 @@
-# Deployment Guide - Water Level Monitor
+# Deployment Guide — Water Level Monitor
 
-## Quick Deploy to Raspberry Pi
+Current architecture (since 2026-07): an **ESP32** running ESPHome reads the float switch
+and exposes it over the ESPHome native API; a **Mac mini** runs `water_server.py`, which
+holds a persistent connection to the sensor and sends email alerts.
 
-### Step 1: Copy Files to Raspberry Pi
+The Raspberry Pi deployment was decommissioned in 2026-07. `water_monitor.py`,
+`water-monitor.service`, `setup.sh` and the `test_*.py` helpers at the repo root are Pi-era
+files kept for reference; they are not part of the running system.
 
-From your Mac, run:
+| | |
+|---|---|
+| Sensor | `water-sensor.local` (192.168.1.207), ESP32 + ESPHome, float switch on GPIO4 |
+| Server | Mac mini — `ETMiniM1.local`, user `erictran` |
+| Install dir | `/Users/erictran/Script/water-monitor` |
+| Service | `com.erictran.water-monitor`, a **system LaunchDaemon** |
+| Source | `server/` (Mac mini), `esp32/` (firmware) |
 
-```bash
-# Navigate to the project directory
-cd /Users/erictran/rpi/water-monitor
+## Deploying the server
 
-# Copy entire directory to Raspberry Pi
-# Replace 'pi-hostname' with your Pi's IP address or hostname
-scp -r . pi@pi-hostname:/home/erictran/Script/water-monitor/
-
-# Or if you're using a specific user:
-scp -r . erictran@pi-hostname:/home/erictran/Script/water-monitor/
-```
-
-### Step 2: SSH into Raspberry Pi
-
-```bash
-ssh pi@pi-hostname
-# or
-ssh erictran@pi-hostname
-```
-
-### Step 3: Run Setup Script
+From this repo on your Mac:
 
 ```bash
-cd /home/erictran/Script/water-monitor
-chmod +x setup.sh
-./setup.sh
+cd server
+scp water_server.py config.py requirements.txt status.sh install_server.sh \
+    com.erictran.water-monitor.plist TROUBLESHOOTING.md \
+    erictran@ETMiniM1.local:/Users/erictran/Script/water-monitor/
 ```
 
-This will:
-- Install Python GPIO library
-- Create log directory
-- Make scripts executable
-- Test email configuration
-
-### Step 4: Configure Email (if needed)
-
-Edit the config file:
-```bash
-nano config.py
-```
-
-Update these lines:
-```python
-EMAIL_FROM = "your-email@gmail.com"
-EMAIL_PASSWORD = "your-16-char-app-password"
-EMAIL_TO = ["recipient@example.com"]
-```
-
-Save and exit (Ctrl+X, Y, Enter)
-
-### Step 5: Test Everything
+Then on the mini (the installer **requires sudo** — see the warning below):
 
 ```bash
-# Test email
-python3 test_email.py
-
-# Test float switch (move float up and down)
-python3 test_water_monitor.py
-# Press Ctrl+C to stop
-
-# Send manual test email
-python3 manual_test.py
+cd ~/Script/water-monitor && sudo bash install_server.sh
 ```
 
-### Step 6: Install as Service (Recommended)
+The installer is idempotent. It creates the venv if missing, installs dependencies only
+when they don't already import, retires any old user LaunchAgent and tmux session, then
+installs and bootstraps the LaunchDaemon and prints status.
+
+For a code-only change you can skip the full install and just restart:
 
 ```bash
-# Copy service file
-sudo cp water-monitor.service /etc/systemd/system/
-
-# Reload systemd
-sudo systemctl daemon-reload
-
-# Enable service (start on boot)
-sudo systemctl enable water-monitor.service
-
-# Start service now
-sudo systemctl start water-monitor.service
-
-# Check status
-sudo systemctl status water-monitor.service
+sudo launchctl kickstart -k system/com.erictran.water-monitor
 ```
 
-### Step 7: Verify Service is Running
+## ⚠️ It must be a system LaunchDaemon — not a user LaunchAgent
+
+This is the single most important fact about this deployment.
+
+macOS 15+ **Local Network Privacy** silently denies local-subnet traffic (TCP *and* mDNS)
+to processes launched by launchd in the *user* domain. The binaries involved (Homebrew
+`tmux`, uv-managed `python3`) are ad-hoc signed with no stable identity, so they never
+appear in System Settings → Privacy & Security → Local Network — there is **no permission
+to grant**, and no prompt is ever shown. System-domain daemons are exempt.
+
+Running it as a LaunchAgent produces a server that starts fine, logs fine, heartbeats
+fine, and is completely blind — `[Errno 65] No route to host` against a sensor that
+`ping` and `nc` both report as perfectly reachable. This caused ~24 hours of undetected
+downtime on 2026-08-14.
+
+Full diagnosis, including the launch-context comparison table: **`server/TROUBLESHOOTING.md`**.
+
+## Verifying
 
 ```bash
-# Should show "active (running)"
-sudo systemctl status water-monitor.service
-
-# Watch logs in real-time
-sudo journalctl -u water-monitor.service -f
-# Press Ctrl+C to stop watching
+bash ~/Script/water-monitor/status.sh
 ```
 
-## Alternative: Manual Deployment
+A healthy system shows `process: RUNNING`, `✓ connected`, and hourly log lines like:
 
-If you prefer to deploy manually:
-
-### 1. Create Directory
-```bash
-ssh pi@pi-hostname
-mkdir -p /home/erictran/Script/water-monitor
-cd /home/erictran/Script/water-monitor
+```
+heartbeat: water OK, sensor connected, wifi <SSID> via AP <BSSID> @ -59 dBm
 ```
 
-### 2. Copy Files One by One
-```bash
-# From your Mac, in separate terminal
-cd /Users/erictran/rpi/water-monitor
+Do **not** treat `ping`/`nc` reachability as health — it stayed green for the entire
+2026-08-14 outage. The connection state line and the heartbeat are the real indicators.
 
-scp config.py pi@pi-hostname:/home/erictran/Script/water-monitor/
-scp water_monitor.py pi@pi-hostname:/home/erictran/Script/water-monitor/
-scp test_water_monitor.py pi@pi-hostname:/home/erictran/Script/water-monitor/
-scp test_email.py pi@pi-hostname:/home/erictran/Script/water-monitor/
-scp manual_test.py pi@pi-hostname:/home/erictran/Script/water-monitor/
-scp setup.sh pi@pi-hostname:/home/erictran/Script/water-monitor/
-scp water-monitor.service pi@pi-hostname:/home/erictran/Script/water-monitor/
-scp README.md pi@pi-hostname:/home/erictran/Script/water-monitor/
-```
-
-### 3. Make Executable
-```bash
-# On Raspberry Pi
-cd /home/erictran/Script/water-monitor
-chmod +x *.py *.sh
-```
-
-### 4. Install Dependencies
-```bash
-sudo apt-get update
-sudo apt-get install -y python3-rpi.gpio
-```
-
-### 5. Continue with Step 4 above
-
-## Updating Existing Installation
-
-If you already have the monitor installed and want to update:
+Useful commands:
 
 ```bash
-# From your Mac
-cd /Users/erictran/rpi/water-monitor
-scp water_monitor.py pi@pi-hostname:/home/erictran/Script/water-monitor/
-
-# On Raspberry Pi
-ssh pi@pi-hostname
-sudo systemctl restart water-monitor.service
+tail -f ~/Script/water-monitor/water_monitor.log      # application log
+tail -f ~/Script/water-monitor/server.err.log         # daemon stdout/stderr
+sudo launchctl print system/com.erictran.water-monitor
 ```
 
-## Deployment Checklist
+### Verify after reboot
 
-- [ ] Files copied to Pi
-- [ ] Dependencies installed
-- [ ] Email configured
-- [ ] Email test passed
-- [ ] Float switch test passed
-- [ ] Service installed
-- [ ] Service running
-- [ ] Logs showing normal operation
-
-## Troubleshooting Deployment
-
-### Can't connect to Pi
-```bash
-# Find Pi on network
-ping raspberrypi.local
-
-# Or scan network
-nmap -sn 192.168.1.0/24
-```
-
-### Permission denied
-```bash
-# On Pi, fix permissions
-sudo chown -R erictran:erictran /home/erictran/Script/water-monitor
-chmod +x /home/erictran/Script/water-monitor/*.py
-```
-
-### Service won't start
-```bash
-# Check logs
-sudo journalctl -u water-monitor.service -n 50
-
-# Verify paths in service file
-cat /etc/systemd/system/water-monitor.service
-
-# Test manually first
-cd /home/erictran/Script/water-monitor
-python3 water_monitor.py
-```
-
-### GPIO permission denied
-```bash
-# Add user to gpio group
-sudo usermod -a -G gpio erictran
-
-# Reboot
-sudo reboot
-```
-
-## Post-Deployment
-
-### Monitor for First 24 Hours
+The daemon is `RunAtLoad` + `KeepAlive` in `/Library/LaunchDaemons`, so it starts at boot
+**without requiring anyone to log in** — unlike the old LaunchAgent, which needed a GUI
+login session. After any reboot:
 
 ```bash
-# Watch logs
-sudo journalctl -u water-monitor.service -f
-
-# Check log file
-tail -f /home/erictran/Script/water_monitor.log
+bash ~/Script/water-monitor/status.sh
 ```
 
-### Test Low Water Alert
+If it does not come up, check that the plist is still `root:wheel` in
+`/Library/LaunchDaemons` and consult `server/TROUBLESHOOTING.md` before changing anything.
 
-1. Manually lower the float switch
-2. Wait 2 seconds (debounce time)
-3. Check email for alert
-4. Raise float switch
-5. Check email for restoration alert
+## Deploying firmware to the ESP32
 
-### Verify After Reboot
+From `esp32/` (requires `esphome`, and `secrets.yaml` which is gitignored):
 
 ```bash
-# Reboot Pi
-sudo reboot
-
-# After reboot, check service
-sudo systemctl status water-monitor.service
-
-# Should show "active (running)"
+esphome run water-sensor.yaml
 ```
 
-## Production Recommendations
+OTA is enabled, so the device does not need to be plugged in after the first flash.
 
-1. **Use static IP** for your Raspberry Pi
-2. **Set up SSH keys** for passwordless login
-3. **Configure log rotation** to prevent disk fill
-4. **Test monthly** to ensure system is working
-5. **Keep backups** of config.py (without passwords)
-6. **Document** any customizations you make
+Note: with no `reboot_timeout` set in the `api:` block, ESPHome's default applies — the
+ESP32 **reboots every 15 minutes if no API client is connected**. A sensor whose uptime
+never exceeds 15 minutes is a symptom of the server not connecting, not a flaky sensor.
 
 ## Uninstall
 
-If you need to remove the water monitor:
-
 ```bash
-# Stop and disable service
-sudo systemctl stop water-monitor.service
-sudo systemctl disable water-monitor.service
-
-# Remove service file
-sudo rm /etc/systemd/system/water-monitor.service
-
-# Reload systemd
-sudo systemctl daemon-reload
-
-# Remove files
-rm -rf /home/erictran/Script/water-monitor
-
-# Remove log file
-rm /home/erictran/Script/water_monitor.log
+sudo launchctl bootout system/com.erictran.water-monitor
+sudo rm /Library/LaunchDaemons/com.erictran.water-monitor.plist
+rm -rf ~/Script/water-monitor
 ```
-
-## Support
-
-After deployment, refer to:
-- **README.md** - Complete documentation
-- **QUICKSTART.md** - Quick reference
-- **CHECKLIST.md** - Verification steps
-- **Log files** - For troubleshooting
-
----
-
-**Deployment Date:** _______________
-
-**Pi Hostname/IP:** _______________
-
-**Notes:** _______________________________________________
